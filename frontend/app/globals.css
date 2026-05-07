@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0f172a;
+  --foreground: #e2e8f0;
+  --card: #1e293b;
+  --card-border: #334155;
+  --accent: #3b82f6;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.citation-highlight {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-left: 3px solid var(--accent);
+  transition: all 0.2s ease;
+}
