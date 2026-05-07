@@ -40,6 +40,21 @@ EMBED_BATCH_SIZE = 64
 TARGET_PAPERS = 30000
 
 
+def _request_with_retry(url: str, params: dict, max_retries: int = 3) -> httpx.Response:
+    for attempt in range(max_retries):
+        try:
+            with httpx.Client(timeout=90) as client:
+                resp = client.get(url, params=params)
+                resp.raise_for_status()
+                return resp
+        except (httpx.RemoteProtocolError, httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+            if attempt == max_retries - 1:
+                raise
+            wait = 2 ** attempt
+            print(f"  Retry {attempt + 1}/{max_retries} after {e.__class__.__name__}, waiting {wait}s...")
+            time.sleep(wait)
+
+
 def search_pubmed(query: str, retmax: int = 2000) -> list[str]:
     """Search PubMed and return list of PMIDs."""
     params = {
@@ -49,10 +64,8 @@ def search_pubmed(query: str, retmax: int = 2000) -> list[str]:
         "retmode": "json",
         "sort": "relevance",
     }
-    with httpx.Client(timeout=30) as client:
-        resp = client.get(PUBMED_SEARCH_URL, params=params)
-        resp.raise_for_status()
-        data = resp.json()
+    resp = _request_with_retry(PUBMED_SEARCH_URL, params)
+    data = resp.json()
     return data.get("esearchresult", {}).get("idlist", [])
 
 
@@ -64,9 +77,7 @@ def fetch_abstracts(pmids: list[str]) -> list[dict]:
         "retmode": "xml",
         "rettype": "abstract",
     }
-    with httpx.Client(timeout=60) as client:
-        resp = client.get(PUBMED_FETCH_URL, params=params)
-        resp.raise_for_status()
+    resp = _request_with_retry(PUBMED_FETCH_URL, params)
 
     root = ET.fromstring(resp.content)
     papers = []
@@ -173,7 +184,15 @@ def main():
             paper["embedding"] = embeddings[j]
             batch.append(paper)
 
-        client.table("papers").upsert(batch, on_conflict="pmid").execute()
+        for attempt in range(3):
+            try:
+                client.table("papers").upsert(batch, on_conflict="pmid").execute()
+                break
+            except Exception as e:
+                if attempt == 2:
+                    print(f"\n  Failed batch at index {i}: {e}")
+                    break
+                time.sleep(2 ** attempt)
 
     print(f"\nDone! Indexed {len(all_papers)} papers.")
 

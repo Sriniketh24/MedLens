@@ -57,11 +57,11 @@ export default function CitationCard({ paper, index, highlighted }: CitationCard
               <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-700">
                 <div
                   className="h-full rounded-full bg-primary-500"
-                  style={{ width: `${Math.min(paper.rerank_score * 100, 100)}%` }}
+                  style={{ width: `${Math.min(Math.max((paper.rerank_score / 10) * 100, 0), 100)}%` }}
                 />
               </div>
               <span className="text-[10px] text-slate-500">
-                relevance {(paper.rerank_score * 100).toFixed(0)}%
+                relevance {Math.min(Math.max(Math.round((paper.rerank_score / 10) * 100), 0), 100)}%
               </span>
             </div>
           )}
